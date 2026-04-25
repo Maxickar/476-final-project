@@ -18,7 +18,7 @@ import os, textwrap, re, time
 import requests
 
 #added in apikey, apibase, model from the tutorial just replace the key with yours
-API_KEY  = os.getenv("OPENAI_API_KEY", "")
+API_KEY  = os.getenv("OPENAI_API_KEY", "sk-WBrqi_i3c-t_RYD2DsJdxw")
 API_BASE = os.getenv("API_BASE", "https://openai.rc.asu.edu/v1")  
 MODEL    = os.getenv("MODEL_NAME", "qwen3-30b-a3b-instruct-2507")  
 INPUT_PATH = Path("cse_476_final_project_test_data.json")
@@ -77,11 +77,31 @@ def call_model_chat_completions(prompt: str,
             return {"ok": False, "text": None, "raw": None, "status": status, "error": str(err_text), "headers": hdrs}
     except requests.RequestException as e:
         return {"ok": False, "text": None, "raw": None, "status": -1, "error": str(e), "headers": {}}
+
+#first technique: direct prompt enters in the question and gets an answer
+def direct(question):
+    result = call_model_chat_completions(question["input"])
+    answer = result["text"]
+    return answer
+
+#second technique self refine basically entering in the question and checking to make sure its good
+def refine(question):
+    #same thing as direct prompt technique
+    result = call_model_chat_completions(question["input"])
+    answer = result["text"]
+
+    #calling the api again to ask it to check if the answer matches the question
+    checky = call_model_chat_completions("Answer: " + answer + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
+    return checky
+    
+
+#this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     answers = []
     for idx, question in enumerate(questions, start=1):
-        result = call_model_chat_completions(question["input"])
-        answer = result["text"].strip()
+
+        #change the method to one of the technques
+        answer = refine(question)
         answers.append({"output": answer})
         print(f"{idx} / {len(questions)} done")
     return answers
