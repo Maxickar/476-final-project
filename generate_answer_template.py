@@ -18,7 +18,7 @@ import os, textwrap, re, time
 import requests
 
 #added in apikey, apibase, model from the tutorial just replace the key with yours
-API_KEY  = os.getenv("OPENAI_API_KEY", "sk-VnCScs7AvG7Kp5J6UiOOrQ")
+API_KEY  = os.getenv("OPENAI_API_KEY", "")
 API_BASE = os.getenv("API_BASE", "https://openai.rc.asu.edu/v1")  
 MODEL    = os.getenv("MODEL_NAME", "qwen3-30b-a3b-instruct-2507")  
 INPUT_PATH = Path("cse_476_final_project_test_data.json")
