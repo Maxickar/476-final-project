@@ -110,8 +110,8 @@ def self_consistency(question):
     # generate multiple answers
     answers = []
     for _ in range(3):
-        prompt = ("Answer the question with only the final answer in as few words as possible.\n\n" + question["input"])
-        result = call_model_chat_completions(prompt)
+        prompt = ("Answer the question with only the final answer in as few words as possible: " + question["input"])
+        result = call_model_chat_completions(prompt, temperature=0.69)
         answers.append(result["text"])
     
     # now it selects the most consistent answer
@@ -123,9 +123,14 @@ def self_consistency(question):
 #fifth technique: decomposition prompting, I will ask the model to break down the question into smaller sub-questions and then answer each sub-question before combining them into a final answer
 def decomposition(question):
     # decompose the question into sub-questions
-    prompt = ("Break the question into sub-questions internally, solve them, and return only the final answer in as few words as possible.\n\n"+ question["input"])
+    prompt = "Break the question into sub-questions internally" + question["input"]
     result = call_model_chat_completions(prompt)
-    sub_questions = result["text"].split("\n")
+    answery = result["text"]
+
+    prompty = call_model_chat_completions("Solve these: " + answery)
+    answery = prompty["text"]
+    prompter = call_model_chat_completions("combine these answers : " + answery + " to answer this question: " + question["input"])
+    return prompter["text"]
 
 #sixth technique: plan and solve prompting lists out a plan and then calls the api again to use that plan to get an answer (we might want to tweak the prompt later?)
 def plan(question):
@@ -134,7 +139,7 @@ def plan(question):
     #steps = steps["text"]
     #return steps
     
-    answer = call_model_chat_completions(question["input"] + ". Follow the steps and give the final answer only to this questions: "+ steps)
+    answer = call_model_chat_completions(question["input"] + ". Follow the steps and give the final answer only to this question: "+ steps)
     results = answer["text"]
     return results
 
@@ -272,22 +277,24 @@ def decidey(question):
     if category == "code":
         return generatey(question)
 
-    if category == "decomposition":
+    elif category == "decomposition":
         return decomposition(question)
 
-    if category == "multiple_choice":
+    elif category == "multiple_choice":
         return chain_of_thought(question)
-    if category == "math":
+    elif category == "math":
         return tool_augmented(question)
 
-    if category == "reasoning" or category == "context":
+    elif category == "reasoning":
+        return plan(question)
+    elif category == "conetext":
         return chain_of_thought(question)
 
     # longer questions need more passes i think so it uses these techniques
-    if len(question_text) > 400:
+    elif len(question_text) > 400:
         return self_consistency(question)
 
-    if len(question_text) > 180:
+    elif len(question_text) > 180:
         return refine(question)
 
     #if something goes wrong goes to direct
@@ -309,7 +316,7 @@ def QuestyType(question_text):
     category = result["text"]
     #just in case of spaces this just cleans it up to get accurate categorys
     valid = ["code", "context", "decomposition", "math", "multiple_choice", "reasoning", "direct"]
-    #print(category)
+    print(category)
     #returnign the category else just returns direct
     if category in valid:
         return category
@@ -350,7 +357,7 @@ def validate_results(
 
 def main() -> None:
     questions = load_questions(INPUT_PATH)
-    questions = questions[:10]
+    questions = questions[60:80]
     answers = build_answers(questions)
 
     with OUTPUT_PATH.open("w") as fp:
