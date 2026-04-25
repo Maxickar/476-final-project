@@ -101,6 +101,20 @@ def chain_of_thought(question):
     answer = result["text"]
     cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n"  + "Draft answer: " + str(answer))
     return cleanup["text"]
+
+# fourth technique: self-consistency prompting, I will ask the model to generate multiple answers and then select the most consistent one
+def self_consistency(question):
+    # generate multiple answers
+    answers = []
+    for _ in range(3):
+        prompt = ("Answer the question with only the final answer in as few words as possible.\n\n" + question["input"])
+        result = call_model_chat_completions(prompt)
+        answers.append(result["text"])
+    
+    # now it selects the most consistent answer
+    draft_answer = max(answers, key=len)
+    cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(draft_answer))
+    return cleanup["text"]
     
 # --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
 SYSTEM_AGENT = """You are a math tool-using agent.
