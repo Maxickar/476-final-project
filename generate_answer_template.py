@@ -95,7 +95,7 @@ def refine(question):
     answer = refined["text"]
     
     checky = call_model_chat_completions("Answer: " + str(answer) + ". Now please verify if this answers the question: " + question["input"] + "\n And make sure there are not explanations just the answer.")
-    return checky
+    return checky["text"]
 
 # third technique: chain of thought prompting basically asking the model to think on the question and then answer it
 def chain_of_thought(question):
@@ -266,6 +266,7 @@ def decidey(question):
     question_text = question["input"]
     # for now we will just use the direct technique for all questions but we will can change this logic to decide which technique to use based on the question
     category = QuestyType(question_text)
+    #print(category)
 
     #these conditional statements check what type of prmpt to use
     if category == "code":
@@ -275,6 +276,11 @@ def decidey(question):
         return decomposition(question)
 
     if category == "multiple_choice":
+        return chain_of_thought(question)
+    if category == "math":
+        return tool_augmented(question)
+
+    if category == "reasoning" or category == "context":
         return chain_of_thought(question)
 
     # longer questions need more passes i think so it uses these techniques
@@ -290,7 +296,7 @@ def decidey(question):
 # this handles code questions
 def generatey(question):
     prompt = "Write a python function for this task, only return the code no explanations or examples:\n\n" + question["input"]
-    result = call_model_chat_completions(prompt, system="You are a python programmer, return only valid python code.", max_tokens=420)
+    result = call_model_chat_completions(prompt, system="You are a python programmer, return only valid python code.")
     return result["text"]
     
 #this figures out what kind of question it is
@@ -298,12 +304,12 @@ def QuestyType(question_text):
     prompty = "Classify this question into exactly one category: code, context, decomposition, math, multiple_choice, reasoning, direct.\n"
     prompty += "code: write/implement code. context: answer from a passage. decomposition: link multiple facts. math: numeric problem. multiple_choice: has options. reasoning: multi-step. direct: simple.\n"
     prompty += "Return only the category label.\n\nQuestion: " + question_text[:2069]
-    result = call_model_chat_completions(prompty, system="You are a routing classifier. Return only one category label.", max_tokens=420)
-    category = result.get("text", "").strip().lower()
+    result = call_model_chat_completions(prompty, system="You are a routing classifier. Return only one category label.")
+    print(result["text"])
+    category = result["text"]
     #just in case of spaces this just cleans it up to get accurate categorys
-    category = category.replace(" ", "_").replace("\n", "")
     valid = ["code", "context", "decomposition", "math", "multiple_choice", "reasoning", "direct"]
-    
+    #print(category)
     #returnign the category else just returns direct
     if category in valid:
         return category
@@ -314,8 +320,8 @@ def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     answers = []
     for idx, question in enumerate(questions, start=1):
 
-        #change tto decide_technique()
-        answer = decide_technique(question)(question)
+        #change tto decidey()
+        answer = decidey(question)
         answers.append({"output": answer})
         print(f"{idx} / {len(questions)} done")
     return answers
@@ -344,6 +350,7 @@ def validate_results(
 
 def main() -> None:
     questions = load_questions(INPUT_PATH)
+    questions = questions[:10]
     answers = build_answers(questions)
 
     with OUTPUT_PATH.open("w") as fp:
@@ -360,4 +367,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
