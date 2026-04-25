@@ -56,7 +56,7 @@ def call_model_chat_completions(prompt: str,
             {"role": "user",   "content": prompt}
         ],
         "temperature": temperature,
-        "max_tokens": 128,
+        "max_tokens": 420,
     }
 
     try:
@@ -122,15 +122,16 @@ def self_consistency(question):
 #eighth technique: least to most prompting, basically we break the question into smaller parts easiest first and build up to the answer
 def leastmost(question):
     #break it into lil sub questions from easy to hard
-    questy = call_model_chat_completions("break this into sub questions easiest to hardest, just list them and separate them by forward slashes: " + question["input"])
-    questr = questy ["text"]
-
+    questy = call_model_chat_completions("break this into two sub questions easiest to hardest, just list them and separate them by forward slashes: " + question["input"])
+    print("hi")
+    questr = questy["text"]
+    return questr
     #answer each sub question one by one
-    subanswers = ""
-    for splitty in questr.split("/"):
+    subanswers = questr.split("/")
+    for splitty in subanswers:
 
-        answers = call_model_chat_completions("answer briefly: " + splitty + " context so far: " + subanswers)
-        subanswers += splitty + ", " + answers["text"]
+        answers = call_model_chat_completions("answer briefly: " + splitty)
+        subanswers += splitty + " " + answers["text"]
 
     #smoosh it all together
     answers = call_model_chat_completions("answer this using these answers"+ subanswers + " from the sub questions, final answer only: " + question["input"])
@@ -158,19 +159,6 @@ def plan(question):
     answer = call_model_chat_completions(question["input"] + ". Follow the steps and give the final answer only to this question: "+ steps)
     results = answer["text"]
     return results
-
-    # answer each sub-question
-    sub_answers = []
-    for sub_q in sub_questions:
-        result = call_model_chat_completions(
-            "Answer this sub-question briefly.\n\n" + sub_q
-        )
-        sub_answers.append(result["text"])
-    
-    # combine the answers to get the final answer
-    final_answer = " ".join(sub_answers)
-    cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(final_answer))
-    return cleanup["text"]
 
 
 # --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
