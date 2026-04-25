@@ -116,6 +116,28 @@ def self_consistency(question):
     cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(draft_answer))
     return cleanup["text"]
     
+
+#fifth technique: decomposition prompting, I will ask the model to break down the question into smaller sub-questions and then answer each sub-question before combining them into a final answer
+def decomposition(question):
+    # decompose the question into sub-questions
+    prompt = ("Break the question into sub-questions internally, solve them, and return only the final answer in as few words as possible.\n\n"+ question["input"])
+    result = call_model_chat_completions(prompt)
+    sub_questions = result["text"].split("\n")
+
+    # answer each sub-question
+    sub_answers = []
+    for sub_q in sub_questions:
+        result = call_model_chat_completions(
+            "Answer this sub-question briefly.\n\n" + sub_q
+        )
+        sub_answers.append(result["text"])
+    
+    # combine the answers to get the final answer
+    final_answer = " ".join(sub_answers)
+    cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(final_answer))
+    return cleanup["text"]
+
+
 # --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
 SYSTEM_AGENT = """You are a math tool-using agent.
 You may do exactly ONE of the following in your reply:
