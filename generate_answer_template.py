@@ -124,6 +124,17 @@ def decomposition(question):
     result = call_model_chat_completions(prompt)
     sub_questions = result["text"].split("\n")
 
+#sixth technique: plan and solve prompting lists out a plan and then calls the api again to use that plan to get an answer (we might want to tweak the prompt later?)
+def plan(question):
+    steps = call_model_chat_completions("give a plan by listing the steps needed to answer this question: " + question["input"])
+    steps = steps["text"]
+    #steps = steps["text"]
+    #return steps
+    
+    answer = call_model_chat_completions(question["input"] + ". Follow the steps and give the final answer only to this questions: "+ steps)
+    results = answer["text"]
+    return results
+
     # answer each sub-question
     sub_answers = []
     for sub_q in sub_questions:
