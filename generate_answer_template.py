@@ -261,22 +261,53 @@ def tool_augmented(question, verbose: bool = True): #verbose is for debugging pu
     return r1["text"].strip()
 
 
-# in order to use the techniques, we need to teach the model on what techniques to use for what questions
+#decidey function just checks what type of prompting technique to use
+def decidey(question):
+    question_text = question["input"]
+    # for now we will just use the direct technique for all questions but we will can change this logic to decide which technique to use based on the question
+    category = QuestyType(question_text)
 
-def decide_technique(question):
-    # for simplicity, I will just use the length of the question to decide which technique to use
-    if len(question["input"]) < 100:
-        return direct
-    elif len(question["input"]) < 200:
-        return refine
-    elif len(question["input"]) < 300:
-        return chain_of_thought
-    elif len(question["input"]) < 400:
-        return self_consistency
-    elif len(question["input"]) < 500:
-        return decomposition
-    else:
-        return tool_augmented
+    #these conditional statements check what type of prmpt to use
+    if category == "code":
+        return generatey(question)
+
+    if category == "decomposition":
+        return decomposition(question)
+
+    if category == "multiple_choice":
+        return chain_of_thought(question)
+
+    # longer questions need more passes i think so it uses these techniques
+    if len(question_text) > 400:
+        return self_consistency(question)
+
+    if len(question_text) > 180:
+        return refine(question)
+
+    #if something goes wrong goes to direct
+    return direct(question)
+
+# this handles code questions
+def generatey(question):
+    prompt = "Write a python function for this task, only return the code no explanations or examples:\n\n" + question["input"]
+    result = call_model_chat_completions(prompt, system="You are a python programmer, return only valid python code.", max_tokens=420)
+    return result["text"]
+    
+#this figures out what kind of question it is
+def QuestyType(question_text):
+    prompty = "Classify this question into exactly one category: code, context, decomposition, math, multiple_choice, reasoning, direct.\n"
+    prompty += "code: write/implement code. context: answer from a passage. decomposition: link multiple facts. math: numeric problem. multiple_choice: has options. reasoning: multi-step. direct: simple.\n"
+    prompty += "Return only the category label.\n\nQuestion: " + question_text[:2069]
+    result = call_model_chat_completions(prompty, system="You are a routing classifier. Return only one category label.", max_tokens=420)
+    category = result.get("text", "").strip().lower()
+    #just in case of spaces this just cleans it up to get accurate categorys
+    category = category.replace(" ", "_").replace("\n", "")
+    valid = ["code", "context", "decomposition", "math", "multiple_choice", "reasoning", "direct"]
+    
+    #returnign the category else just returns direct
+    if category in valid:
+        return category
+    return "direct"
 
 #this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
