@@ -161,6 +161,46 @@ def safe_eval(expr: str):
         raise ValueError(f"Disallowed expression: {ast.dump(n, include_attributes=False)}")
     return ev(node)
 
+# seventh technique: tool-augmented prompting, we will use the model to call an external tool (e.g. a calculator) to help answer the question
+def tool_augmented(question, verbose: bool = True): #verbose is for debugging purposes
+
+    r1 = call_model_chat_completions(make_first_prompt(question["input"]), system=SYSTEM_AGENT)
+
+    if not r1["ok"] or not r1["text"]:
+        return ""
+    
+    if verbose: print("LLM ->", r1["text"])
+
+    try:
+        action, payload = parse_action(r1["text"])
+    except Exception:
+        return r1["text"].strip()  # fallback raw answer if parsing fails
+    
+    if action == "FINAL":
+        return payload.strip()
+    
+    if action == "CALCULATE":
+        try:
+            calc_value = safe_eval(payload)
+        except Exception:
+            return r1["text"].strip()  # fallback raw answer if calculation fails
+        if verbose: print("CALC =", calc_value)
+        # send results back to model for final answer
+        rN = call_model_chat_completions(make_second_prompt(calc_value), system=SYSTEM_AGENT)
+        if not rN["ok"] or not rN["text"]:
+            return str(calc_value)  # fallback to just returning the calculation result if model fails on second step
+        if verbose: print("LLM →", rN["text"])
+        try:
+            action2, payload2 = parse_action(rN["text"])
+            if action2 == "FINAL":
+                return payload2.strip()
+        except Exception:
+            pass
+        #Fallback
+        return str(calc_value)
+    
+    #Final fallback if action is unrecognized
+    return r1["text"].strip()
 
 #this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
