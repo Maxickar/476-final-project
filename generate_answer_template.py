@@ -277,6 +277,46 @@ def decide_technique(question):
         return decomposition
     else:
         return tool_augmented
+    
+def classify_question(question_text: str) -> str:
+    prompt = textwrap.dedent(
+        f"""
+        Classify this question into exactly one category:
+        code, context, decomposition, math, multiple_choice, reasoning, direct.
+
+        Definitions:
+        - code: asks to write, implement, define, debug, or complete code.
+        - context: gives Context/Facts/a passage and asks an answer from it.
+        - decomposition: needs selecting, comparing, or linking entities across several facts/context snippets.
+        - math: arithmetic, counting, percentages, or numeric word problem in any language.
+        - multiple_choice: gives answer options.
+        - reasoning: needs common-sense, causal, scientific, or multi-step reasoning.
+        - direct: simple short-answer question.
+
+        Return only the category label.
+
+        Question:
+        {question_text[:2000]}
+        """
+    ).strip()
+    result = call_model_chat_completions(
+        prompt,
+        system="You are a routing classifier. Return only one category label.",
+        temperature=0.0,
+        max_tokens=16,
+    )
+    category = re.sub(r"[^a-z_]", "", (result.get("text") or "").strip().lower())
+    return category if category in ROUTER_CATEGORIES else "direct"
+
+ROUTER_CATEGORIES = {
+    "code",
+    "context",
+    "decomposition",
+    "math",
+    "multiple_choice",
+    "reasoning",
+    "direct",
+}
 
 #this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
