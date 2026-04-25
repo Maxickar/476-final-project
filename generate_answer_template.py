@@ -264,19 +264,40 @@ def tool_augmented(question, verbose: bool = True): #verbose is for debugging pu
 # in order to use the techniques, we need to teach the model on what techniques to use for what questions
 
 def decide_technique(question):
-    # for simplicity, I will just use the length of the question to decide which technique to use
-    if len(question["input"]) < 100:
-        return direct
-    elif len(question["input"]) < 200:
-        return refine
-    elif len(question["input"]) < 300:
-        return chain_of_thought
-    elif len(question["input"]) < 400:
-        return self_consistency
-    elif len(question["input"]) < 500:
-        return decomposition
-    else:
-        return tool_augmented
+    question_text = question["input"]
+    # for now we will just use the direct technique for all questions but we will can change this logic to decide which technique to use based on the question
+    category = classify_question(question_text)
+
+    if category == "code":
+        return code_generation(question)
+
+    if category == "decomposition":
+        return decomposition(question)
+
+    if category == "multiple_choice":
+        return chain_of_thought(question)
+
+    if len(question_text) > 400:
+        return self_consistency(question)
+
+    if len(question_text) > 180:
+        return refine(question)
+
+    return direct(question)
+
+def code_generation(question):
+    prompt = (
+        "Write a correct Python function for the programming task below. "
+        "Return only valid Python code. Do not include markdown fences, explanations, examples, or tests.\n\n"
+        + question["input"]
+    )
+    result = call_model_chat_completions(
+        prompt,
+        system="You are a precise Python programmer. Return only valid Python code.",
+        temperature=0.0,
+        max_tokens=512,
+    )
+    return result["text"]
     
 def classify_question(question_text: str) -> str:
     prompt = textwrap.dedent(
