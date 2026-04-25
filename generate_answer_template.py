@@ -10,7 +10,7 @@ an answers JSON file where each entry contains a string under the "output" key.
 """
 
 from __future__ import annotations
-
+import ast, operator as op
 import json
 from pathlib import Path
 from typing import Any, Dict, List
@@ -94,6 +94,73 @@ def refine(question):
     checky = call_model_chat_completions("Answer: " + answer + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
     return checky
     
+# --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
+SYSTEM_AGENT = """You are a math tool-using agent.
+You may do exactly ONE of the following in your reply:
+1) CALCULATE: <arithmetic expression>
+   - use only numbers, + - * / **, parentheses, and round(x, ndigits)
+   - DO NOT include any units/words (e.g., "days", "cups") in the expression, if there is any units/words, try to convert all into the same unit first and then calculate
+   - example: CALCULATE: round((3*2.49)*1.07, 2)
+2) FINAL: <answer>
+Rules:
+- Keep track of units if present, but do not include them in the CALCULATE expression. You have to convert all quantities to the same unit before calculating. The unit chosen should be the one that the question ask or the smallest unit if the question does not specify.
+- Return ONE final result with unit (if applicable). No other text.
+- If there is .0 at the end of a number, you can remove it (e.g., 5.0 -> 5).
+Example:
+Question: I have been here for 1 year and 2 months. How long have I been here in total? Assume that year is a leap year and I been here since May (May has 31 days)
+Correct: 427
+"""
+
+def make_first_prompt(question: str) -> str:
+    return f"""Question: {question}
+If you need arithmetic to get the answer, reply as:
+CALCULATE: <expression>
+Otherwise reply:
+FINAL: <answer>"""
+
+def make_second_prompt(result: str) -> str:
+    return f"""The calculation result is: {result}
+Now provide the final answer.
+Reply exactly as: FINAL: <answer>"""
+
+ACTION_RE = re.compile(r"^\s*(CALCULATE|FINAL)\s*:\s*(.+?)\s*$", re.IGNORECASE | re.DOTALL)
+
+def parse_action(text: str):
+    """
+    Returns ("CALCULATE", expr) or ("FINAL", answer); raises ValueError on bad format.
+    """
+    m = ACTION_RE.match(text.strip())
+    if not m:
+        raise ValueError(f"Unrecognized action format: {text!r}")
+    action = m.group(1).upper()
+    payload = m.group(2).strip()
+    return action, payload
+
+#Function that evaluates arithmetic expressions.
+ALLOWED_BINOPS = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv, ast.Pow: op.pow, ast.Mod: op.mod}
+ALLOWED_UNOPS  = {ast.UAdd: op.pos, ast.USub: op.neg}
+def safe_eval(expr: str):
+    """
+    Evaluates a tiny arithmetic language: numbers, + - * / ** % parentheses, round(x, ndigits).
+    Converts '^' to '**'. Rejects anything else.
+    """
+    expr = expr.replace("^", "**")
+    if len(expr) > 200:
+        raise ValueError("Expression too long.")
+    node = ast.parse(expr, mode="eval")
+    def ev(n):
+        if isinstance(n, ast.Expression):  return ev(n.body)
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)): return n.value
+        if isinstance(n, ast.UnaryOp) and type(n.op) in ALLOWED_UNOPS:        return ALLOWED_UNOPS[type(n.op)](ev(n.operand))
+        if isinstance(n, ast.BinOp) and type(n.op) in ALLOWED_BINOPS:         return ALLOWED_BINOPS[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "round":
+            args = [ev(a) for a in n.args]
+            return round(*args)
+        if isinstance(n, ast.Tuple):  # allow round(x,2) with comma
+            return tuple(ev(elt) for elt in n.elts)
+        raise ValueError(f"Disallowed expression: {ast.dump(n, include_attributes=False)}")
+    return ev(node)
+
 
 #this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
