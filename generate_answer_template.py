@@ -267,29 +267,26 @@ def tool_augmented(question, verbose: bool = True): #verbose is for debugging pu
 
 #eighth technique: Least-to-most prompting, we will start with breaking the question into sub-questions odering from easiest to hardest and then answer each sub-question before combining them into a final answer.
 def least_to_most(question):
-    question_text = question["input"]
+    questy = question["input"]
     # break the question into sub-questions ordered from easiest to hardest
     decompose_prompt = (
         "Break the given question into sub-questions ordered from easiest to hardest."
         "Do not answer the questions yet."
         "Return only the sub-questions without any explanations.\n\n"
-        "Question: " + question_text
+        "Question: " + questy
     )
 
-    subquestions_result = call_model_chat_completions(decompose_prompt)
+    subq_result = call_model_chat_completions(decompose_prompt)
 
-    if not subquestions_result["ok"] or not subquestions_result["text"]:
-        return direct(question)  # fallback to direct if decomposition fails
+    if not subq_result["ok"] or not subq_result["text"]: return direct(question)  # fallback to direct if decomposition fails
     
-    sub_questions = [
-        line.strip("- ") for line in subquestions_result["text"].splitlines() if line.strip()
-    ]
+    sub_qs = [line.strip("- ") for line in subq_result["text"].splitlines() if line.strip()]
 
     # answer each sub-question
-    sub_answers = []
+    sub_ans = []
 
-    for i, sub_q in enumerate(sub_questions, start=1):
-        previous_context = "\n".join(sub_answers) if sub_answers else ""
+    for i, sub_q in enumerate(sub_qs, start=1):
+        previous_context = "\n".join(sub_ans) if sub_ans else ""
 
         answer_prompt = (
             f"Original question: {question['input']}\n\n"
@@ -298,28 +295,25 @@ def least_to_most(question):
             f"Now answer this next sub-question briefly using only information from the original question:\n{sub_q}"
         )
 
-        sub_answer = call_model_chat_completions(answer_prompt)
+        sub_ans = call_model_chat_completions(answer_prompt)
 
-        if sub_answer["ok"] and sub_answer["text"]:
-            sub_answers.append(
-                f"Subquestion{i}: {sub_q}\nAnswer{i}: {sub_answer['text'].strip()}"
-            )
-        else:
-            return direct(question)  # fallback to direct if any sub-answering fails
+        if sub_ans["ok"] and sub_ans["text"]:
+            sub_ans.append(f"Subquestion{i}: {sub_q}\nAnswer{i}: {sub_ans['text'].strip()}")
+        else: return direct(question)
+        
     # combine the answers to get the final answer
     final_prompt = (
         f"Use the following sub-questions and their answers to answer the original question. Be concise and return only the final answer without any explanations.\n\n"
         f"Original question: {question['input']}\n\n"
-        f"Sub-questions and answers:\n" + "\n\n".join(sub_answers) + "\n\n"
+        f"Sub-questions and answers:\n" + "\n\n".join(sub_ans) + "\n\n"
         "Now combine these into a final answer to the original question."
         "Return only the final answer. Absoloutely no explanations."
     )
-    final_answer = call_model_chat_completions(final_prompt)
+    final_ans = call_model_chat_completions(final_prompt)
 
-    if final_answer["ok"] and final_answer["text"]:
-        return final_answer["text"].strip()
+    if final_ans["ok"] and final_ans["text"]: return final_ans["text"].strip()
     
-    return direct(question)  # fallback to direct if final combination fails
+    return direct(question)  # again, fallback to direct if final combination fails
 
 #decidey function just checks what type of prompting technique to use
 def decidey(question):
