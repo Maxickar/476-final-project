@@ -118,7 +118,23 @@ def self_consistency(question):
     draft_answer = max(answers, key=len)
     cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(draft_answer))
     return cleanup["text"]
-    
+
+#eighth technique: least to most prompting, basically we break the question into smaller parts easiest first and build up to the answer
+def leastmost(question):
+    #break it into lil sub questions from easy to hard
+    questy = call_model_chat_completions("break this into sub questions easiest to hardest, just list them and separate them by forward slashes: " + question["input"])
+    questr = questy ["text"]
+
+    #answer each sub question one by one
+    subanswers = ""
+    for splitty in questr.split("/"):
+
+        answers = call_model_chat_completions("answer briefly: " + splitty + " context so far: " + subanswers)
+        subanswers += splitty + ", " + answers["text"]
+
+    #smoosh it all together
+    answers = call_model_chat_completions("answer this using these answers"+ subanswers + " from the sub questions, final answer only: " + question["input"])
+    return answers["text"]
 
 #fifth technique: decomposition prompting, I will ask the model to break down the question into smaller sub-questions and then answer each sub-question before combining them into a final answer
 def decomposition(question):
