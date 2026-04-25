@@ -246,13 +246,31 @@ def tool_augmented(question, verbose: bool = True): #verbose is for debugging pu
     #Final fallback if action is unrecognized
     return r1["text"].strip()
 
+
+# in order to use the techniques, we need to teach the model on what techniques to use for what questions
+
+def decide_technique(question):
+    # for simplicity, I will just use the length of the question to decide which technique to use
+    if len(question["input"]) < 100:
+        return direct
+    elif len(question["input"]) < 200:
+        return refine
+    elif len(question["input"]) < 300:
+        return chain_of_thought
+    elif len(question["input"]) < 400:
+        return self_consistency
+    elif len(question["input"]) < 500:
+        return decomposition
+    else:
+        return tool_augmented
+
 #this is how we put in the techniques just replce the method name in direct(question) to another technique
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     answers = []
     for idx, question in enumerate(questions, start=1):
 
-        #change the method to one of the technques
-        answer = refine(question)
+        #change tto decide_technique()
+        answer = decide_technique(question)(question)
         answers.append({"output": answer})
         print(f"{idx} / {len(questions)} done")
     return answers
