@@ -91,7 +91,10 @@ def refine(question):
     answer = result["text"]
 
     #calling the api again to ask it to check if the answer matches the question
-    checky = call_model_chat_completions("Answer: " + answer + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
+    refined = call_model_chat_completions("Answer: " + str(answer) + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
+    answer = refined["text"]
+    
+    checky = call_model_chat_completions("Answer: " + str(answer) + ". Now please verify if this answers the question: " + question["input"] + "\n And make sure there are not explanations just the answer.")
     return checky
 
 # third technique: chain of thought prompting basically asking the model to think on the question and then answer it
