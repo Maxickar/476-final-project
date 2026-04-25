@@ -93,6 +93,14 @@ def refine(question):
     #calling the api again to ask it to check if the answer matches the question
     checky = call_model_chat_completions("Answer: " + answer + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
     return checky
+
+# third technique: chain of thought prompting basically asking the model to think on the question and then answer it
+def chain_of_thought(question):
+    prompt = ("Reason through the question, but return only the final answer in as few words as possible.\n\n"  + question["input"])
+    result = call_model_chat_completions(prompt)
+    answer = result["text"]
+    cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n"  + "Draft answer: " + str(answer))
+    return cleanup["text"]
     
 # --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
 SYSTEM_AGENT = """You are a math tool-using agent.
