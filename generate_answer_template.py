@@ -14,8 +14,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Dict, List
+import os, textwrap, re, time
+import requests
 
-
+#added in apikey, apibase, model from the tutorial just replace the key with yours
+API_KEY  = os.getenv("OPENAI_API_KEY", "sk-VnCScs7AvG7Kp5J6UiOOrQ")
+API_BASE = os.getenv("API_BASE", "https://openai.rc.asu.edu/v1")  
+MODEL    = os.getenv("MODEL_NAME", "qwen3-30b-a3b-instruct-2507")  
 INPUT_PATH = Path("cse_476_final_project_test_data.json")
 OUTPUT_PATH = Path("cse_476_final_project_answers.json")
 
@@ -27,15 +32,58 @@ def load_questions(path: Path) -> List[Dict[str, Any]]:
         raise ValueError("Input file must contain a list of question objects.")
     return data
 
+             
 
+#based on the final_project_tutorial section i just put it here for testing not sure if we need to change the prompt?
+def call_model_chat_completions(prompt: str,
+                                system: str = "You are a helpful assistant. Reply with only the final answer—no explanation.",
+                                model: str = MODEL,
+                                temperature: float = 0.0,
+                                timeout: int = 60) -> dict:
+    """
+    Calls an OpenAI-style /v1/chat/completions endpoint and returns:
+    { 'ok': bool, 'text': str or None, 'raw': dict or None, 'status': int, 'error': str or None, 'headers': dict }
+    """
+    url = f"{API_BASE}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type":  "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": 128,
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        status = resp.status_code
+        hdrs   = dict(resp.headers)
+        if status == 200:
+            data = resp.json()
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return {"ok": True, "text": text, "raw": data, "status": status, "error": None, "headers": hdrs}
+        else:
+            # try best-effort to surface error text
+            err_text = None
+            try:
+                err_text = resp.json()
+            except Exception:
+                err_text = resp.text
+            return {"ok": False, "text": None, "raw": None, "status": status, "error": str(err_text), "headers": hdrs}
+    except requests.RequestException as e:
+        return {"ok": False, "text": None, "raw": None, "status": -1, "error": str(e), "headers": {}}
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     answers = []
     for idx, question in enumerate(questions, start=1):
-        # Example: assume you have an agent loop that produces an answer string.
-        # real_answer = agent_loop(question["input"])
-        # answers.append({"output": real_answer})
-        placeholder_answer = f"Placeholder answer for question {idx}"
-        answers.append({"output": placeholder_answer})
+        result = call_model_chat_completions(question["input"])
+        answer = result["text"].strip()
+        answers.append({"output": answer})
+        print(f"{idx} / {len(questions)} done")
     return answers
 
 
