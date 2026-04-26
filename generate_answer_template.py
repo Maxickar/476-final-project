@@ -105,12 +105,14 @@ def chain_of_thought(question):
     cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n"  + "Draft answer: " + str(answer))
     return cleanup["text"]
 
-# fourth technique: self-consistency prompting, I will ask the model to generate multiple answers and then select the most consistent one
+# fourth technique: self-consistency prompting, basically the model to generate multiple answers and then select the most consistent one
 def self_consistency(question):
     # generate multiple answers
     answers = []
     for _ in range(3):
         prompt = ("Answer the question with only the final answer in as few words as possible: " + question["input"])
+
+        #I added in temperature for randomness of answers and made it the funny number
         result = call_model_chat_completions(prompt, temperature=0.69)
         answers.append(result["text"])
     
@@ -121,12 +123,12 @@ def self_consistency(question):
 
 #eighth technique: least to most prompting, basically we break the question into smaller parts easiest first and build up to the answer
 def leastmost(question):
-    #break it into lil sub questions from easy to hard
+    #breaks it into lil sub questions from easy to hard
     questy = call_model_chat_completions("break this into two sub questions easiest to hardest, just list them and separate them by forward slashes: " + question["input"])
     print("hi")
     questr = questy["text"]
     return questr
-    #answer each sub question one by one
+    #this answer each sub question one by one
     subanswers = questr.split("/")
     for splitty in subanswers:
 
@@ -139,7 +141,7 @@ def leastmost(question):
 
 #fifth technique: decomposition prompting, I will ask the model to break down the question into smaller sub-questions and then answer each sub-question before combining them into a final answer
 def decomposition(question):
-    # decompose the question into sub-questions
+    #this decomposes the question into smaller questions to use later
     prompt = "Break the question into sub-questions internally" + question["input"]
     result = call_model_chat_completions(prompt)
     answery = result["text"]
@@ -161,7 +163,7 @@ def plan(question):
     return results
 
 
-# --- PROVIDED: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios  ---
+#In class yall said we could implement this: calculator tools from minilab5 of class CSE476, I use this since there is many calculations in the test data, I make some updates to it to still handle the worst case scenarios
 SYSTEM_AGENT = """You are a math tool-using agent.
 You may do exactly ONE of the following in your reply:
 1) CALCULATE: <arithmetic expression>
