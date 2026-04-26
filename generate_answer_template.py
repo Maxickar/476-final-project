@@ -298,12 +298,12 @@ def decidey(question):
 
     elif category == "multiple_choice":
         return chain_of_thought(question)
-    elif category == "math":
+    elif category == "computation":
         return tool_augmented(question)
 
     elif category == "reasoning":
         return plan(question)
-    elif category == "conetext":
+    elif category == "context" or category == "complex_math":
         return chain_of_thought(question)
 
     # longer questions need more passes i think so it uses these techniques
@@ -324,14 +324,14 @@ def generatey(question):
     
 #this figures out what kind of question it is
 def QuestyType(question_text):
-    prompty = "Classify this question into exactly one category: code, context, decomposition, math, multiple_choice, reasoning, direct.\n"
-    prompty += "code: write/implement code. context: answer from a passage. decomposition: link multiple facts. math: numeric problem. multiple_choice: has options. reasoning: multi-step. direct: simple.\n"
+    prompty = "Classify this question into exactly one category: code, context, decomposition, computation, complex_math, multiple_choice, reasoning, direct.\n"
+    prompty += "code: write/implement code. context: answer from a passage. decomposition: link multiple facts. computation: involves calculations only. complex_math: advanced mathematical problem. multiple_choice: has options. reasoning: multi-step. direct: simple.\n"
     prompty += "Return only the category label.\n\nQuestion: " + question_text[:2069]
     result = call_model_chat_completions(prompty, system="You are a routing classifier. Return only one category label.")
     print(result["text"])
     category = result["text"]
     #just in case of spaces this just cleans it up to get accurate categorys
-    valid = ["code", "context", "decomposition", "math", "multiple_choice", "reasoning", "direct"]
+    valid = ["code", "context", "decomposition", "computation", "complex_math", "multiple_choice", "reasoning", "direct"]
     print(category)
     #returnign the category else just returns direct
     if category in valid:
