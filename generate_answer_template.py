@@ -78,18 +78,18 @@ def call_model_chat_completions(prompt: str,
     except requests.RequestException as e:
         return {"ok": False, "text": None, "raw": None, "status": -1, "error": str(e), "headers": {}}
 
-#first technique: direct prompt enters in the question and gets an answer
+#first technique: direct prompt enters in the question and gets an answer, its very basic and uses what was in the tutorial for prompting
 def direct(question):
     result = call_model_chat_completions(question["input"])
     answer = result["text"]
     return answer
 
-#second technique self refine basically entering in the question and checking to make sure its good
+#second technique self refine basically entering in the question and checking to make sure its good this uses multiple api calls to make sure the model answers the question
 def refine(question):
     #same thing as direct prompt technique
     result = call_model_chat_completions(question["input"])
     answer = result["text"]
-
+    
     #calling the api again to ask it to check if the answer matches the question
     refined = call_model_chat_completions("Answer: " + str(answer) + ". Now please verify if this answers the question: " + question["input"] + "\n And optimize the answer to correctly answer the question.")
     answer = refined["text"]
@@ -111,11 +111,11 @@ def self_consistency(question):
     answers = []
     for _ in range(3):
         prompt = ("Answer the question with only the final answer in as few words as possible: " + question["input"])
-
+        
         #I added in temperature for randomness of answers and made it the funny number
         result = call_model_chat_completions(prompt, temperature=0.69)
         answers.append(result["text"])
-    
+        
     # now it selects the most consistent answer
     draft_answer = max(answers, key=len)
     cleanup = call_model_chat_completions("Return only the final answer in as few words as possible.\n\n" + "Question: " + question["input"] + "\n" + "Draft answer: " + str(draft_answer))
@@ -131,10 +131,10 @@ def leastmost(question):
     #this answer each sub question one by one
     subanswers = questr.split("/")
     for splitty in subanswers:
-
+        
         answers = call_model_chat_completions("answer briefly: " + splitty)
         subanswers += splitty + " " + answers["text"]
-
+        
     #smoosh it all together
     answers = call_model_chat_completions("answer this using these answers"+ subanswers + " from the sub questions, final answer only: " + question["input"])
     return answers["text"]
@@ -145,7 +145,7 @@ def decomposition(question):
     prompt = "Break the question into sub-questions internally" + question["input"]
     result = call_model_chat_completions(prompt)
     answery = result["text"]
-
+    
     prompty = call_model_chat_completions("Solve these: " + answery)
     answery = prompty["text"]
     prompter = call_model_chat_completions("combine these answers : " + answery + " to answer this question: " + question["input"])
@@ -278,41 +278,41 @@ def decidey(question):
     # for now we will just use the direct technique for all questions but we will can change this logic to decide which technique to use based on the question
     category = QuestyType(question_text)
     #print(category)
-
-    #these conditional statements check what type of prmpt to use
+    
+    #these conditional statements check what type of prmpt to use based on the api call for the questions
     if category == "code":
         return generatey(question)
-
+        
     elif category == "decomposition":
         return decomposition(question)
-
+        
     elif category == "multiple_choice":
         return chain_of_thought(question)
     elif category == "computation":
         return tool_augmented(question)
-
+        
     elif category == "reasoning":
         return plan(question)
     elif category == "context" or category == "complex_math":
         return chain_of_thought(question)
-
+        
     # longer questions need more passes i think so it uses these techniques
     elif len(question_text) > 400:
         return self_consistency(question)
-
+        
     elif len(question_text) > 180:
         return refine(question)
-
+        
     #if something goes wrong goes to direct
     return direct(question)
-
+    
 # this handles code questions
 def generatey(question):
     prompt = "Write a python function for this task, only return the code no explanations or examples:\n\n" + question["input"]
     result = call_model_chat_completions(prompt, system="You are a python programmer, return only valid python code.")
     return result["text"]
     
-#this figures out what kind of question it is
+#this figures out what kind of question it is and gives us a word that will correlate to the technique the model uses
 def QuestyType(question_text):
     prompty = "Classify this question into exactly one category: code, context, decomposition, computation, complex_math, multiple_choice, reasoning, direct.\n"
     prompty += "code: write/implement code. context: answer from a passage. decomposition: link multiple facts. computation: involves calculations only. complex_math: advanced mathematical problem. multiple_choice: has options. reasoning: multi-step. direct: simple.\n"
@@ -332,7 +332,7 @@ def QuestyType(question_text):
 def build_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     answers = []
     for idx, question in enumerate(questions, start=1):
-
+        
         #change tto decidey()
         answer = decidey(question)
         answers.append({"output": answer})
